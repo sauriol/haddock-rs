@@ -13,13 +13,16 @@ impl Haddock {
     pub fn new(length: usize, file: &str) -> Haddock {
 
         Haddock {
-            dict: Haddock::load_dict(file),
+            dict: Haddock::load_dict(file).unwrap(),
             length: length,
         }
     }
 
     pub fn generate(&self) -> Option<String> {
         if self.length == 0 {
+            return None;
+        }
+        if self.length < 8 || self.length > 50 {
             return None;
         }
 
@@ -29,8 +32,14 @@ impl Haddock {
         let mut word_2 = String::new();
 
         while (word_1.chars().count() + word_2.chars().count()) != word_len {
-            word_1 = self.word();
-            word_2 = self.word();
+            word_1 = match self.word() {
+                Some(word)  =>  word,
+                None        => return None,
+            };
+            word_2 = match self.word() {
+                Some(word)  => word,
+                None        => return None,
+            }
         }
 
         let filler = self.filler(self.length - word_len);
@@ -43,24 +52,27 @@ impl Haddock {
         return Some(pass);
     }
 
-    fn load_dict(file: &str) -> Vec<String> {
-        let words = fs::read_to_string(file)
-            .expect("Something went wrong reading the file");
+    fn load_dict(file: &str) -> Result<Vec<String>, &'static str> {
+        let words = match fs::read_to_string(file) {
+            Ok(words)   => words,
+            Err(_)    => return Err("Unable to open wordlist"),
+        };
 
-        let mut dict : Vec<String> = words.lines()
+        let dict : Vec<String> = words.lines()
             .map(str::trim)
             .filter(|w| !w.is_empty())
             .map(|w| w.to_owned())
             .collect();
 
-        dict.sort_unstable_by(|a, b| a.chars().count().cmp(&b.chars().count()));
-
-        return dict;
+        return Ok(dict);
     }
 
-    fn word(&self) -> String {
+    fn word(&self) -> Option<String> {
         let mut rng = thread_rng();
-        return self.dict.choose(&mut rng).unwrap().to_owned();
+        match self.dict.choose(&mut rng) {
+            Some(word)  =>  return Some(word.to_owned()),
+            None        =>  return None,
+        }
     }
 
     fn filler(&self, length: usize) -> String {
